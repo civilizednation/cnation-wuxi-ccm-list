@@ -101,7 +101,7 @@
                         <div>
                             <label class="block text-[11px] font-bold text-gray-500 mb-1 uppercase tracking-wider">🎵
                                 MP3 음원 (선택)</label>
-                            <input type="file" id="mp3Input" accept="audio/mp3"
+                            <input type="file" id="mp3Input" accept="audio/*, .mp3"
                                 class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
                         </div>
                     </div>
@@ -136,18 +136,17 @@
     </div>
 
     <script type="module">
-        // ★ Supabase 기본 세팅 (고정값 적용)
+        // ★ Supabase 기본 세팅
         const SUPABASE_URL = 'https://nydnthkqvpajufbycxjq.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_LWqTdLhSkspLke1HvFsmVA_KOYnGGaY';
         const { createClient } = supabase;
         const _supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // ★ 임의로 명명한 테이블 및 버킷명 (cnation- 규칙 적용)
         const tableName = 'cnation_table01';
         const bucketName = 'cnation-storage';
 
         let globalSongs = [];
-        let currentOffset = 0; // 페이징용 오프셋 (Firebase의 startAfter 대체)
+        let currentOffset = 0;
         let isFetching = false;
         const FETCH_LIMIT = 5;
         const ADMIN_PASSWORD = "1257";
@@ -161,7 +160,6 @@
             toggleIcon.textContent = formContent.classList.contains('hidden') ? '➕' : '➖';
         });
 
-        // 썸네일 생성 함수 (그대로 사용)
         function generateThumbnail(file) {
             return new Promise((resolve) => {
                 const reader = new FileReader();
@@ -186,7 +184,6 @@
             });
         }
 
-        // DOM 렌더링
         function appendSongToDOM(data) {
             const listDiv = document.getElementById('songList');
             const tagColor = data.type === '창작곡' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700';
@@ -211,7 +208,6 @@
             listDiv.insertAdjacentHTML('beforeend', itemHtml);
         }
 
-        // ★ Supabase 초기 5개 불러오기
         async function loadSongsInitial(sortField, sortDirection) {
             const listDiv = document.getElementById('songList');
             const moreBtnContainer = document.getElementById('moreBtnContainer');
@@ -223,7 +219,6 @@
             const isAsc = sortDirection === 'asc';
 
             try {
-                // Supabase의 range(from, to)를 이용한 페이징
                 const { data, error } = await _supabase.from(tableName)
                     .select('*')
                     .order(sortField, { ascending: isAsc })
@@ -263,7 +258,6 @@
             document.getElementById('loadMoreBtn').addEventListener('click', () => loadMoreSongs(sortField, sortDirection));
         }
 
-        // ★ Supabase 다음 5개 추가 로딩
         async function loadMoreSongs(sortField, sortDirection) {
             if (isFetching) return;
             isFetching = true;
@@ -304,7 +298,6 @@
             loadSongsInitial(field, direction);
         });
 
-        // Supabase Storage 업로드 헬퍼 함수
         async function uploadToStorage(path, file, type) {
             const { data, error } = await _supabase.storage.from(bucketName).upload(path, file, {
                 contentType: type,
@@ -315,7 +308,7 @@
             return publicUrlData.publicUrl;
         }
 
-        // ★ 곡 등록 로직 (DB + Storage)
+        // ★ 곡 등록 로직 (DB + Storage: 안전한 파일명 및 유연한 타입 적용 완료)
         document.getElementById('addBtn').addEventListener('click', async () => {
             const title = document.getElementById('titleInput').value;
             const type = document.getElementById('typeInput').value;
@@ -332,20 +325,23 @@
             try {
                 const timeStr = Date.now();
 
-                // 1. Storage 원본 이미지 업로드
-                const imagePath = `images/${timeStr}_${imageFile.name}`;
-                const imageUrl = await uploadToStorage(imagePath, imageFile, imageFile.type);
+                // 1. Storage 원본 이미지 업로드 (한글 파일명 방어)
+                const imageExt = imageFile.name.split('.').pop();
+                const imagePath = `images/${timeStr}_cover.${imageExt}`;
+                const imageUrl = await uploadToStorage(imagePath, imageFile, imageFile.type || 'image/jpeg');
 
                 // 2. Storage 썸네일 업로드
                 const thumbnailBlob = await generateThumbnail(imageFile);
                 const thumbPath = `thumbnails/${timeStr}_thumb.jpg`;
                 const thumbnailUrl = await uploadToStorage(thumbPath, thumbnailBlob, 'image/jpeg');
 
-                // 3. Storage MP3 업로드
+                // 3. Storage MP3 업로드 (한글 파일명 방어 & 유연한 파일 형식 인식)
                 let mp3Url = "";
                 if (mp3File) {
-                    const mp3Path = `audio/${timeStr}_${mp3File.name}`;
-                    mp3Url = await uploadToStorage(mp3Path, mp3File, 'audio/mp3');
+                    const mp3Ext = mp3File.name.split('.').pop();
+                    const mp3Path = `audio/${timeStr}_audio.${mp3Ext}`;
+                    const mimeType = mp3File.type || 'audio/mpeg'; // 고정값 해제
+                    mp3Url = await uploadToStorage(mp3Path, mp3File, mimeType);
                 }
 
                 // 4. DB 테이블 Insert
@@ -363,14 +359,13 @@
                 alert("성공적으로 곡이 등록되었습니다! 🎉");
                 location.reload();
             } catch (err) {
-                console.error(err);
-                alert("업로드 에러: 테이블 또는 버킷 설정을 확인하세요.");
+                console.error("업로드 에러 상세:", err);
+                alert("🚨 에러 발생!\n상세원인: " + (err.message || JSON.stringify(err)));
                 document.getElementById('addBtn').classList.remove('hidden');
                 document.getElementById('uploadStatus').classList.add('hidden');
             }
         });
 
-        // 모달창 및 수정/삭제 로직 (Supabase용으로 변경)
         window.openModal = (id) => {
             const song = globalSongs.find(s => s.id == id);
             if (!song) return;
@@ -405,7 +400,6 @@
 
         window.closeModal = () => document.getElementById('detailModal').classList.add('hidden');
 
-        // DB Data Delete (Storage 파일 삭제는 생략)
         window.deleteSong = async (id) => {
             const pwd = prompt("관리자 비밀번호를 입력하세요");
             if (pwd === ADMIN_PASSWORD && confirm("이 곡을 삭제하시겠습니까?")) {
