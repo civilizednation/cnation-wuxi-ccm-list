@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>cnation CCM 아카이브 🎵</title>
+
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="cnation CCM">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        .modal-content {
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 min-h-screen font-sans text-gray-800 pb-20">
+
+    <div class="max-w-2xl mx-auto pt-6 px-4">
+
+        <div
+            class="relative rounded-2xl shadow-lg mb-8 overflow-hidden bg-gray-800 flex items-center justify-center min-h-[180px]">
+            <div class="absolute inset-0 bg-cover bg-center bg-no-repeat"
+                style="background-image: url('./cnation-ccm.png');"></div>
+            <div class="absolute inset-0 bg-black/40 backdrop-blur-[2px]"></div>
+            <div class="relative z-10 p-6 text-center w-full">
+                <h1
+                    class="text-4xl sm:text-5xl font-extrabold text-white mb-2 tracking-widest drop-shadow-lg uppercase">
+                    cnation CCM
+                </h1>
+                <p class="text-gray-100 text-sm tracking-widest drop-shadow-md font-medium">
+                    설교와 말씀 기반의 찬양 기록
+                </p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm p-4 mb-6 relative">
+            <div class="flex justify-between items-center mb-4 px-2">
+                <h2 class="text-lg font-bold text-gray-700">전체 곡 목록</h2>
+                <select id="sortSelect"
+                    class="text-xs border border-gray-300 text-gray-600 py-1 px-2 rounded-lg focus:ring-2 focus:ring-indigo-400 bg-gray-50 outline-none cursor-pointer">
+                    <option value="creationDate_desc">최신 제작일순 🔽</option>
+                    <option value="creationDate_asc">오래된 제작일순 🔼</option>
+                    <option value="title_asc">제목 가나다순 🔼</option>
+                    <option value="title_desc">제목 역순 🔽</option>
+                    <option value="creator_asc">작사/작곡자순 🔼</option>
+                </select>
+            </div>
+
+            <div id="songList"></div>
+            <div id="moreBtnContainer" class="mt-4"></div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            <button id="toggleFormBtn"
+                class="w-full flex justify-between items-center p-5 focus:outline-none hover:bg-gray-50 transition">
+                <h2 class="text-lg font-bold text-gray-700">새로운 곡 등록하기</h2>
+                <span id="toggleIcon"
+                    class="text-xl text-indigo-600 font-bold transition-transform duration-300">➕</span>
+            </button>
+
+            <div id="formContent" class="hidden px-5 pb-6">
+                <div class="grid grid-cols-1 gap-4 mt-2 border-t border-gray-100 pt-4">
+                    <div class="flex gap-2">
+                        <select id="typeInput"
+                            class="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-400 bg-gray-50 text-sm outline-none">
+                            <option value="창작곡">창작곡</option>
+                            <option value="커버송">커버송</option>
+                        </select>
+                        <input type="text" id="titleInput" placeholder="곡 제목 (예: 나를 부르신 이유)"
+                            class="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-400 text-sm outline-none">
+                    </div>
+
+                    <div class="flex gap-2">
+                        <input type="text" id="creatorInput" placeholder="작사/작곡 (예: 문명국)"
+                            class="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-400 text-sm outline-none">
+                        <div class="relative w-36">
+                            <input type="date" id="dateInput" title="곡 제작일"
+                                class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-400 text-sm text-gray-600 bg-gray-50 outline-none">
+                        </div>
+                    </div>
+
+                    <input type="text" id="youtubeInput" placeholder="유튜브 주소 링크"
+                        class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-400 text-sm outline-none">
+
+                    <div class="p-4 bg-gray-50 border border-dashed border-gray-300 rounded-lg space-y-3">
+                        <div>
+                            <label class="block text-[11px] font-bold text-gray-500 mb-1 uppercase tracking-wider">🖼️
+                                타이틀 이미지 (필수)</label>
+                            <input type="file" id="imageInput" accept="image/*"
+                                class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-gray-500 mb-1 uppercase tracking-wider">🎵
+                                MP3 음원 (선택)</label>
+                            <input type="file" id="mp3Input" accept="audio/mp3"
+                                class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                        </div>
+                    </div>
+
+                    <textarea id="descInput" rows="2" placeholder="곡 설명 (설교 본문, 핵심 메시지 등)"
+                        class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-400 text-sm outline-none"></textarea>
+                    <textarea id="lyricsInput" rows="5" placeholder="가사 (Verse, Chorus 등 줄바꿈 유지)"
+                        class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-400 text-sm outline-none"></textarea>
+                    <textarea id="promptInput" rows="2" placeholder="제작 정보 (Suno 프롬프트, 스타일 등)"
+                        class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-400 text-sm outline-none"></textarea>
+
+                    <button id="addBtn"
+                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200 shadow-md mt-2">
+                        업로드 및 등록하기
+                    </button>
+                    <p id="uploadStatus" class="text-sm text-center text-indigo-600 font-bold hidden">Storage 및 DB에 업로드
+                        중입니다... ⏳</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="detailModal" class="fixed inset-0 bg-black bg-opacity-70 hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl w-full max-w-lg shadow-2xl relative flex flex-col modal-content"
+            style="max-height: 85vh;">
+            <button onclick="closeModal()"
+                class="absolute top-3 right-3 text-gray-500 hover:text-gray-900 bg-white/90 backdrop-blur rounded-full w-8 h-8 flex items-center justify-center shadow-lg z-20 transition-all">
+                <i class="fas fa-times text-lg"></i>
+            </button>
+            <div id="modalContent" class="overflow-y-auto w-full rounded-2xl pb-6"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // ★ Supabase 기본 세팅 (고정값 적용)
+        const SUPABASE_URL = 'https://nydnthkqvpajufbycxjq.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_LWqTdLhSkspLke1HvFsmVA_KOYnGGaY';
+        const { createClient } = supabase;
+        const _supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // ★ 임의로 명명한 테이블 및 버킷명 (cnation- 규칙 적용)
+        const tableName = 'cnation_table01';
+        const bucketName = 'CNATION-STORAGE';
+
+        let globalSongs = [];
+        let currentOffset = 0; // 페이징용 오프셋 (Firebase의 startAfter 대체)
+        let isFetching = false;
+        const FETCH_LIMIT = 5;
+        const ADMIN_PASSWORD = "1257";
+
+        document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
+
+        document.getElementById('toggleFormBtn').addEventListener('click', () => {
+            const formContent = document.getElementById('formContent');
+            const toggleIcon = document.getElementById('toggleIcon');
+            formContent.classList.toggle('hidden');
+            toggleIcon.textContent = formContent.classList.contains('hidden') ? '➕' : '➖';
+        });
+
+        // 썸네일 생성 함수 (그대로 사용)
+        function generateThumbnail(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width, height = img.height;
+                        const max_size = 300;
+                        if (width > height) {
+                            if (width > max_size) { height *= max_size / width; width = max_size; }
+                        } else {
+                            if (height > max_size) { width *= max_size / height; height = max_size; }
+                        }
+                        canvas.width = width; canvas.height = height;
+                        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                        canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.6);
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // DOM 렌더링
+        function appendSongToDOM(data) {
+            const listDiv = document.getElementById('songList');
+            const tagColor = data.type === '창작곡' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700';
+            const dateStr = data.creationDate ? data.creationDate.split('-').join('. ') + '.' : '';
+            const displayImage = data.thumbnailUrl ? data.thumbnailUrl : data.imageUrl;
+
+            const itemHtml = `
+                <div onclick="openModal('${data.id}')" class="flex items-center p-3 bg-white border border-gray-100 rounded-xl hover:shadow-md cursor-pointer transition mt-3">
+                    <img src="${displayImage}" loading="lazy" class="w-16 h-16 rounded-lg object-cover shadow-sm mr-4 shrink-0" alt="cover">
+                    <div class="flex-1">
+                        <div class="flex items-center justify-between mb-0.5">
+                            <h3 class="font-bold text-gray-800 text-base line-clamp-1">${data.title}</h3>
+                            <span class="text-[10px] text-gray-400 font-medium">${dateStr}</span>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded ${tagColor} mr-2">${data.type}</span>
+                            <span class="text-xs text-gray-500">${data.creator}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            listDiv.insertAdjacentHTML('beforeend', itemHtml);
+        }
+
+        // ★ Supabase 초기 5개 불러오기
+        async function loadSongsInitial(sortField, sortDirection) {
+            const listDiv = document.getElementById('songList');
+            const moreBtnContainer = document.getElementById('moreBtnContainer');
+            listDiv.innerHTML = '<p class="text-center text-gray-400 py-4">데이터 로딩 중...</p>';
+            moreBtnContainer.innerHTML = '';
+            globalSongs = [];
+            currentOffset = 0;
+
+            const isAsc = sortDirection === 'asc';
+
+            try {
+                // Supabase의 range(from, to)를 이용한 페이징
+                const { data, error } = await _supabase.from(tableName)
+                    .select('*')
+                    .order(sortField, { ascending: isAsc })
+                    .range(0, FETCH_LIMIT - 1);
+
+                if (error) throw error;
+                listDiv.innerHTML = '';
+
+                if (!data || data.length === 0) {
+                    listDiv.innerHTML = '<p class="text-center text-gray-400 py-4">등록된 곡이 없습니다.</p>';
+                    return;
+                }
+
+                data.forEach(song => {
+                    globalSongs.push(song);
+                    appendSongToDOM(song);
+                });
+
+                currentOffset += data.length;
+
+                if (data.length === FETCH_LIMIT) {
+                    renderMoreButton(sortField, sortDirection);
+                }
+            } catch (err) {
+                console.error(err);
+                listDiv.innerHTML = '<p class="text-center text-red-400 py-4">DB 테이블 확인이 필요합니다.</p>';
+            }
+        }
+
+        function renderMoreButton(sortField, sortDirection) {
+            const moreBtnContainer = document.getElementById('moreBtnContainer');
+            moreBtnContainer.innerHTML = `
+                <button id="loadMoreBtn" class="w-full bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-600 font-bold py-3 rounded-xl transition shadow-sm text-sm">
+                    다음 5곡 더 보기 🔽
+                </button>
+            `;
+            document.getElementById('loadMoreBtn').addEventListener('click', () => loadMoreSongs(sortField, sortDirection));
+        }
+
+        // ★ Supabase 다음 5개 추가 로딩
+        async function loadMoreSongs(sortField, sortDirection) {
+            if (isFetching) return;
+            isFetching = true;
+            document.getElementById('loadMoreBtn').innerHTML = '불러오는 중...';
+
+            const isAsc = sortDirection === 'asc';
+
+            try {
+                const { data, error } = await _supabase.from(tableName)
+                    .select('*')
+                    .order(sortField, { ascending: isAsc })
+                    .range(currentOffset, currentOffset + FETCH_LIMIT - 1);
+
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    data.forEach(song => {
+                        globalSongs.push(song);
+                        appendSongToDOM(song);
+                    });
+                    currentOffset += data.length;
+                }
+
+                if (data.length === FETCH_LIMIT) {
+                    renderMoreButton(sortField, sortDirection);
+                } else {
+                    document.getElementById('moreBtnContainer').innerHTML = '<p class="text-center text-xs text-gray-400 mt-4">모든 곡을 불러왔습니다.</p>';
+                }
+            } catch (err) {
+                console.error(err);
+                renderMoreButton(sortField, sortDirection);
+            }
+            isFetching = false;
+        }
+
+        document.getElementById('sortSelect').addEventListener('change', (e) => {
+            const [field, direction] = e.target.value.split('_');
+            loadSongsInitial(field, direction);
+        });
+
+        // Supabase Storage 업로드 헬퍼 함수
+        async function uploadToStorage(path, file, type) {
+            const { data, error } = await _supabase.storage.from(bucketName).upload(path, file, {
+                contentType: type,
+                upsert: false
+            });
+            if (error) throw error;
+            const { data: publicUrlData } = _supabase.storage.from(bucketName).getPublicUrl(path);
+            return publicUrlData.publicUrl;
+        }
+
+        // ★ 곡 등록 로직 (DB + Storage)
+        document.getElementById('addBtn').addEventListener('click', async () => {
+            const title = document.getElementById('titleInput').value;
+            const type = document.getElementById('typeInput').value;
+            const creator = document.getElementById('creatorInput').value;
+            const creationDate = document.getElementById('dateInput').value;
+            const imageFile = document.getElementById('imageInput').files[0];
+            const mp3File = document.getElementById('mp3Input').files[0];
+
+            if (!title || !imageFile || !creationDate) return alert('곡 제목, 타이틀 이미지, 제작일은 필수입니다!');
+
+            document.getElementById('addBtn').classList.add('hidden');
+            document.getElementById('uploadStatus').classList.remove('hidden');
+
+            try {
+                const timeStr = Date.now();
+
+                // 1. Storage 원본 이미지 업로드
+                const imagePath = `images/${timeStr}_${imageFile.name}`;
+                const imageUrl = await uploadToStorage(imagePath, imageFile, imageFile.type);
+
+                // 2. Storage 썸네일 업로드
+                const thumbnailBlob = await generateThumbnail(imageFile);
+                const thumbPath = `thumbnails/${timeStr}_thumb.jpg`;
+                const thumbnailUrl = await uploadToStorage(thumbPath, thumbnailBlob, 'image/jpeg');
+
+                // 3. Storage MP3 업로드
+                let mp3Url = "";
+                if (mp3File) {
+                    const mp3Path = `audio/${timeStr}_${mp3File.name}`;
+                    mp3Url = await uploadToStorage(mp3Path, mp3File, 'audio/mp3');
+                }
+
+                // 4. DB 테이블 Insert
+                const { error: dbError } = await _supabase.from(tableName).insert([{
+                    title: title, type: type, creator: creator, creationDate: creationDate,
+                    youtubeUrl: document.getElementById('youtubeInput').value,
+                    desc: document.getElementById('descInput').value,
+                    lyrics: document.getElementById('lyricsInput').value,
+                    prompt: document.getElementById('promptInput').value,
+                    imageUrl: imageUrl, thumbnailUrl: thumbnailUrl, mp3Url: mp3Url
+                }]);
+
+                if (dbError) throw dbError;
+
+                alert("성공적으로 곡이 등록되었습니다! 🎉");
+                location.reload();
+            } catch (err) {
+                console.error(err);
+                alert("업로드 에러: 테이블 또는 버킷 설정을 확인하세요.");
+                document.getElementById('addBtn').classList.remove('hidden');
+                document.getElementById('uploadStatus').classList.add('hidden');
+            }
+        });
+
+        // 모달창 및 수정/삭제 로직 (Supabase용으로 변경)
+        window.openModal = (id) => {
+            const song = globalSongs.find(s => s.id == id);
+            if (!song) return;
+
+            let ytEmbed = "";
+            if (song.youtubeUrl) {
+                let videoId = song.youtubeUrl.split('v=')[1]?.split('&')[0] || song.youtubeUrl.split('youtu.be/')[1]?.split('?')[0];
+                if (videoId) ytEmbed = `<iframe class="w-full aspect-video mb-4 rounded-lg" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe>`;
+            }
+
+            let audioPlayer = song.mp3Url ? `<audio controls class="w-full mt-2 mb-4 px-4"><source src="${song.mp3Url}" type="audio/mp3"></audio>` : '';
+            const dateStr = song.creationDate ? song.creationDate.split('-').join('. ') + '.' : '';
+
+            document.getElementById('modalContent').innerHTML = `
+                <div><img src="${song.imageUrl}" class="w-full aspect-square object-cover" alt="cover"></div>
+                <div class="p-6">
+                    <h2 class="text-2xl font-bold text-gray-800">${song.title}</h2>
+                    <p class="text-xs text-gray-500 mt-1 mb-4">${dateStr} 제작 | ${song.creator} | ${song.type}</p>
+                    ${audioPlayer} ${ytEmbed}
+                    <div class="space-y-4 mt-6">
+                        ${song.desc ? `<div><h4 class="text-[11px] font-bold text-indigo-600 mb-1">📖 곡 설명</h4><p class="text-sm bg-gray-50 p-4 rounded-xl whitespace-pre-line">${song.desc}</p></div>` : ''}
+                        ${song.lyrics ? `<div><h4 class="text-[11px] font-bold text-indigo-600 mb-1">🎤 가사</h4><p class="text-sm bg-gray-50 p-4 rounded-xl whitespace-pre-line">${song.lyrics}</p></div>` : ''}
+                        ${song.prompt ? `<div><h4 class="text-[11px] font-bold text-indigo-600 mb-1">🛠️ 제작 정보</h4><p class="text-[11px] bg-gray-100 p-4 rounded-xl whitespace-pre-line">${song.prompt}</p></div>` : ''}
+                    </div>
+                    <div class="mt-8 pt-4 border-t flex justify-end gap-3">
+                        <button onclick="deleteSong('${id}')" class="text-xs text-red-500 font-bold px-3 py-1.5 bg-red-50 rounded-lg">삭제하기</button>
+                    </div>
+                </div>
+            `;
+            document.getElementById('detailModal').classList.remove('hidden');
+        };
+
+        window.closeModal = () => document.getElementById('detailModal').classList.add('hidden');
+
+        // DB Data Delete (Storage 파일 삭제는 생략)
+        window.deleteSong = async (id) => {
+            const pwd = prompt("관리자 비밀번호를 입력하세요");
+            if (pwd === ADMIN_PASSWORD && confirm("이 곡을 삭제하시겠습니까?")) {
+                const { error } = await _supabase.from(tableName).delete().eq('id', id);
+                if (error) alert("삭제 실패"); else location.reload();
+            } else if (pwd !== null) alert("비밀번호 불일치");
+        };
+
+        loadSongsInitial('creationDate', 'desc');
+    </script>
+</body>
+
+</html>
