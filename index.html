@@ -308,7 +308,6 @@
             return publicUrlData.publicUrl;
         }
 
-        // ★ 곡 등록 로직 (DB + Storage: 안전한 파일명 및 유연한 타입 적용 완료)
         document.getElementById('addBtn').addEventListener('click', async () => {
             const title = document.getElementById('titleInput').value;
             const type = document.getElementById('typeInput').value;
@@ -325,26 +324,22 @@
             try {
                 const timeStr = Date.now();
 
-                // 1. Storage 원본 이미지 업로드 (한글 파일명 방어)
                 const imageExt = imageFile.name.split('.').pop();
                 const imagePath = `images/${timeStr}_cover.${imageExt}`;
                 const imageUrl = await uploadToStorage(imagePath, imageFile, imageFile.type || 'image/jpeg');
 
-                // 2. Storage 썸네일 업로드
                 const thumbnailBlob = await generateThumbnail(imageFile);
                 const thumbPath = `thumbnails/${timeStr}_thumb.jpg`;
                 const thumbnailUrl = await uploadToStorage(thumbPath, thumbnailBlob, 'image/jpeg');
 
-                // 3. Storage MP3 업로드 (한글 파일명 방어 & 유연한 파일 형식 인식)
                 let mp3Url = "";
                 if (mp3File) {
                     const mp3Ext = mp3File.name.split('.').pop();
                     const mp3Path = `audio/${timeStr}_audio.${mp3Ext}`;
-                    const mimeType = mp3File.type || 'audio/mpeg'; // 고정값 해제
+                    const mimeType = mp3File.type || 'audio/mpeg';
                     mp3Url = await uploadToStorage(mp3Path, mp3File, mimeType);
                 }
 
-                // 4. DB 테이블 Insert
                 const { error: dbError } = await _supabase.from(tableName).insert([{
                     title: title, type: type, creator: creator, creationDate: creationDate,
                     youtubeUrl: document.getElementById('youtubeInput').value,
@@ -400,12 +395,52 @@
 
         window.closeModal = () => document.getElementById('detailModal').classList.add('hidden');
 
+        // ★ Storage 첨부 파일 동시 삭제 완벽 적용 로직
         window.deleteSong = async (id) => {
             const pwd = prompt("관리자 비밀번호를 입력하세요");
-            if (pwd === ADMIN_PASSWORD && confirm("이 곡을 삭제하시겠습니까?")) {
-                const { error } = await _supabase.from(tableName).delete().eq('id', id);
-                if (error) alert("삭제 실패"); else location.reload();
-            } else if (pwd !== null) alert("비밀번호 불일치");
+            if (pwd === ADMIN_PASSWORD && confirm("이 곡을 삭제하시겠습니까?\n(첨부된 이미지와 MP3 파일도 스토리지에서 영구 삭제됩니다.)")) {
+
+                const song = globalSongs.find(s => s.id == id);
+                if (song) {
+                    const pathsToDelete = [];
+
+                    // DB에 저장된 전체 URL에서 폴더/파일명만 깔끔하게 추출하는 함수
+                    const extractPath = (url) => {
+                        if (!url) return null;
+                        const marker = `/public/${bucketName}/`;
+                        const idx = url.indexOf(marker);
+                        return idx !== -1 ? url.substring(idx + marker.length) : null;
+                    };
+
+                    const imgPath = extractPath(song.imageUrl);
+                    const thumbPath = extractPath(song.thumbnailUrl);
+                    const mp3Path = extractPath(song.mp3Url);
+
+                    // 추출한 경로가 있으면 삭제 목록(배열)에 추가
+                    if (imgPath) pathsToDelete.push(imgPath);
+                    if (thumbPath) pathsToDelete.push(thumbPath);
+                    if (mp3Path) pathsToDelete.push(mp3Path);
+
+                    // 1. Storage에 있는 파일들부터 깔끔하게 비우기
+                    if (pathsToDelete.length > 0) {
+                        const { error: storageError } = await _supabase.storage.from(bucketName).remove(pathsToDelete);
+                        if (storageError) console.error("스토리지 삭제 중 에러 발생:", storageError);
+                    }
+                }
+
+                // 2. Storage 짐을 뺐으니, 마지막으로 DB(장부) 기록 삭제
+                const { error: dbError } = await _supabase.from(tableName).delete().eq('id', id);
+
+                if (dbError) {
+                    alert("삭제 실패: " + dbError.message);
+                } else {
+                    alert("곡과 첨부파일이 완벽하게 삭제되었습니다! 🗑️");
+                    location.reload();
+                }
+
+            } else if (pwd !== null) {
+                alert("비밀번호가 일치하지 않습니다.");
+            }
         };
 
         loadSongsInitial('creationDate', 'desc');
