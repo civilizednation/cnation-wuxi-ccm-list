@@ -243,8 +243,9 @@
                     renderMoreButton(sortField, sortDirection);
                 }
             } catch (err) {
-                console.error(err);
-                listDiv.innerHTML = '<p class="text-center text-red-400 py-4">DB 테이블 확인이 필요합니다.</p>';
+                console.error('loadSongsInitial error', err);
+                const message = err?.message || JSON.stringify(err) || '알 수 없는 DB 오류가 발생했습니다.';
+                listDiv.innerHTML = `<p class="text-center text-red-400 py-4">DB 오류: ${message}</p>`;
             }
         }
 
@@ -287,8 +288,9 @@
                     document.getElementById('moreBtnContainer').innerHTML = '<p class="text-center text-xs text-gray-400 mt-4">모든 곡을 불러왔습니다.</p>';
                 }
             } catch (err) {
-                console.error(err);
-                renderMoreButton(sortField, sortDirection);
+                console.error('loadMoreSongs error', err);
+                const message = err?.message || JSON.stringify(err) || '알 수 없는 DB 오류가 발생했습니다.';
+                document.getElementById('moreBtnContainer').innerHTML = `<p class="text-center text-red-400 py-4">DB 오류: ${message}</p>`;
             }
             isFetching = false;
         }
@@ -304,8 +306,14 @@
                 upsert: false
             });
             if (error) throw error;
-            const { data: publicUrlData } = _supabase.storage.from(bucketName).getPublicUrl(path);
-            return publicUrlData.publicUrl;
+
+            // private 버킷에서 사용하려면 서명 URL을 생성합니다. 30일(2592000초) 기간으로 설정.
+            const expiresIn = 60 * 60 * 24 * 30;
+            const { data: signedUrlData, error: signedUrlError } = await _supabase.storage
+                .from(bucketName)
+                .createSignedUrl(path, expiresIn);
+            if (signedUrlError) throw signedUrlError;
+            return signedUrlData.signedUrl;
         }
 
         document.getElementById('addBtn').addEventListener('click', async () => {
