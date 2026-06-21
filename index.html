@@ -45,6 +45,10 @@
         <div class="bg-white rounded-2xl shadow-sm p-4 mb-6 relative">
             <div class="flex justify-between items-center mb-4 px-2">
                 <h2 class="text-lg font-bold text-gray-700">전체 곡 목록</h2>
+                <button id="reloadSongsBtn" type="button" title="목록 새로고침"
+                    class="ml-auto mr-2 w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-indigo-600 focus:ring-2 focus:ring-indigo-400 transition">
+                    <i class="fas fa-rotate-right text-xs"></i>
+                </button>
                 <select id="sortSelect"
                     class="text-xs border border-gray-300 text-gray-600 py-1 px-2 rounded-lg focus:ring-2 focus:ring-indigo-400 bg-gray-50 outline-none cursor-pointer">
                     <option value="creationDate_desc">최신 제작일순 🔽</option>
@@ -188,11 +192,15 @@
             const listDiv = document.getElementById('songList');
             const tagColor = data.type === '창작곡' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700';
             const dateStr = data.creationDate ? data.creationDate.split('-').join('. ') + '.' : '';
-            const displayImage = data.thumbnailUrl ? data.thumbnailUrl : data.imageUrl;
+            const displayImage = data.thumbnailUrl || data.thumbnail_url || data.thumbnail;
+            const titleInitial = (data.title || '?').trim().charAt(0) || '?';
+            const thumbnailHtml = displayImage
+                ? `<img src="${displayImage}" loading="lazy" class="w-16 h-16 rounded-lg object-cover shadow-sm mr-4 shrink-0" alt="cover">`
+                : `<div class="w-16 h-16 rounded-lg shadow-sm mr-4 shrink-0 bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl font-extrabold">(${titleInitial})</div>`;
 
             const itemHtml = `
                 <div onclick="openModal('${data.id}')" class="flex items-center p-3 bg-white border border-gray-100 rounded-xl hover:shadow-md cursor-pointer transition mt-3">
-                    <img src="${displayImage}" loading="lazy" class="w-16 h-16 rounded-lg object-cover shadow-sm mr-4 shrink-0" alt="cover">
+                    ${thumbnailHtml}
                     <div class="flex-1">
                         <div class="flex items-center justify-between mb-0.5">
                             <h3 class="font-bold text-gray-800 text-base line-clamp-1">${data.title}</h3>
@@ -206,6 +214,42 @@
                 </div>
             `;
             listDiv.insertAdjacentHTML('beforeend', itemHtml);
+        }
+
+        function getCurrentSort() {
+            const [field, direction] = document.getElementById('sortSelect').value.split('_');
+            return { field, direction };
+        }
+
+        function wait(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function reloadSongsWithRetry({ manual = false } = {}) {
+            const reloadBtn = document.getElementById('reloadSongsBtn');
+            const { field, direction } = getCurrentSort();
+            const maxAttempts = manual ? 4 : 1;
+
+            if (manual && reloadBtn) {
+                reloadBtn.disabled = true;
+                reloadBtn.classList.add('opacity-60', 'cursor-wait');
+                reloadBtn.querySelector('i')?.classList.add('fa-spin');
+                await wait(350);
+            }
+
+            try {
+                for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                    await loadSongsInitial(field, direction);
+                    if (globalSongs.length > 0 || attempt === maxAttempts) break;
+                    await wait(500 * attempt);
+                }
+            } finally {
+                if (manual && reloadBtn) {
+                    reloadBtn.disabled = false;
+                    reloadBtn.classList.remove('opacity-60', 'cursor-wait');
+                    reloadBtn.querySelector('i')?.classList.remove('fa-spin');
+                }
+            }
         }
 
         async function loadSongsInitial(sortField, sortDirection) {
@@ -296,6 +340,10 @@
         document.getElementById('sortSelect').addEventListener('change', (e) => {
             const [field, direction] = e.target.value.split('_');
             loadSongsInitial(field, direction);
+        });
+
+        document.getElementById('reloadSongsBtn').addEventListener('click', () => {
+            reloadSongsWithRetry({ manual: true });
         });
 
         async function uploadToStorage(path, file, type) {
